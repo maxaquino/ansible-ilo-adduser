@@ -1,0 +1,46 @@
+---
+- hosts: localhost
+
+  vars:
+    config: "oneview_config.json"
+
+    server_hardware_name: "ILOXXXYYYZZZ"
+    ilo_username: "user"
+    ilo_password: "password"
+
+  vars_files:
+    - vars/accounts.yml
+
+
+  pre_tasks:
+
+  - name: GET server hardware using name
+    tags:
+       - get-server-hardware
+
+    oneview_server_hardware_facts:
+       config: "{{ config }}"
+       name: "{{ server_hardware_name }}"
+       options:
+          - bios
+          - javaRemoteConsoleUrl
+          - physicalServerHardware
+          - environmentalConfig
+          - iloSsoUrl
+          - remoteConsoleUrl
+
+    ignore_errors: yes
+    register: command_result
+    when: server_hardware_name is defined
+
+  - name: Set server hardware
+    tags:
+       - oneview-get-server-hardware
+    set_fact:
+       server_hardware: "{{ server_hardwares[0] }}"
+    when: server_hardwares is defined and server_hardware_name is defined
+
+
+  roles:
+     - get-ilo-sso
+     - ilo-create-account

@@ -1,0 +1,93 @@
+###############################################################################################
+###
+# Copyright (2016-2017) Hewlett Packard Enterprise Development LP
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# You may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+###
+###############################################################################################
+
+- name: Sanity check - must have server hardware
+  tags:
+    - get-ilo-sso
+  fail:
+    msg: "The variable server_harware must be specified for this role!"
+  when: server_hardware is not defined
+
+  
+- name: Log operation
+  tags:
+    - get-ilo-sso
+  shell: echo "`date "+%Y-%m-%d %H:%M:%S"` START GET ILO-SSO {{ server_hardware.name }}" >> {{ stats_log }}
+  when: "stats_log is defined"
+ 
+  
+- name: Set operation status flag
+  tags:
+    - get-ilo-sso
+  set_fact:
+    op_status: "OK"
+
+- name: Get ILO SSO URL and remote console URL
+  tags:
+    - get-ilo-sso
+  oneview_server_hardware_facts:
+    config: "{{ config }}"
+    name: "{{ server_hardware.name }}"
+    options:   
+         - iloSsoUrl              
+         - remoteConsoleUrl
+  ignore_errors: yes
+  register: command_result
+
+- name: Display remote console URL
+  tags:
+    - get-ilo-sso
+  debug: var=server_hardware_remote_console_url
+   
+- name: Display remote console URL
+  tags:
+    - get-ilo-sso
+  debug: var=server_hardware_ilo_sso_url
+ 
+
+- name: Fail if we have an empty list
+  tags:
+    - get-ilo-sso
+  set_fact:
+    op_status: "FAIL"
+    op_msg: "Could not find server hardware matching the search criteria!}!"
+  when: server_hardwares == []
+  
+- name: Check result for message
+  tags:
+    - get-ilo-sso
+  set_fact:
+    op_status: "FAIL"
+    op_msg: "{{ command_result.msg }}"
+  when: command_result.failed is defined and command_result.failed == true
+
+- name: Log messsage
+  tags:
+    - get-ilo-sso
+  shell: echo "`date "+%Y-%m-%d %H:%M:%S"` {{ op_status }} GET_SERVER_PROFILE {{ server_profile_name }} {{ op_msg }}" >> {{ stats_log }}
+  when: "stats_log is defined"
+
+- name: Fail if errored
+  tags:
+    - get-ilo-sso
+  fail:
+    msg: "{{ op_msg }}"
+  when:
+    op_status == "FAIL"
+
+  

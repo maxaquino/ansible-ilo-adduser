@@ -1,0 +1,126 @@
+###############################################################################################
+###
+# Copyright (2016-2017) Hewlett Packard Enterprise Development LP
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# You may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+###
+###############################################################################################
+
+- name: Sanity check - must have server hardware
+  tags:
+    - ilo-create-account
+  fail:
+    msg: "The variable server_hardware_remote_console_url must be specified for this role!"
+  when: server_hardware_remote_console_url is not defined
+
+- name: Set operation status flag
+  tags:
+    - ilo-create-user
+  set_fact:
+    op_status: "OK"
+    
+- name: Bletch
+  tags:
+    - ilo-create-user
+  debug: var=server_hardware_remote_console_url
+
+- name: Get ILO IP
+  tags:
+    - ilo-create-user
+  set_fact:
+    ilo_ip: "{{ server_hardware_remote_console_url.remoteConsoleUrl  | regex_search('addr=\\b(?:[0-9]{1,3}\\.){3}[0-9]{1,3}\\b') | regex_replace('addr=','') }}"
+
+- name: Check if we have an IP
+  tags:
+    - ilo-create-user
+  set_fact:
+    op_msg: "Could not get an ILO IP addresss from OneView; response={{ server_hardware_remote_console_url.remoteConsoleUrl }}!"
+    op_status: "FAIL"
+  when: ilo_ip is not defined or ilo_ip == ""
+    
+- name: Get ILO auth token
+  tags:
+    - ilo-create-user
+  set_fact:
+    ilo_auth_token: "{{ server_hardware_remote_console_url.remoteConsoleUrl | regex_search('sessionkey=(\\S*)$') | regex_replace('sessionkey=','')}}"
+
+- name: Check if we have an auth token
+  tags:
+    - ilo-create-user
+  set_fact:
+    op_msg: "Could not get an ILO authentication token from OneView; response={{ server_hardware_remote_console_url.remoteConsoleUrl }}!"
+    op_status: "FAIL"
+  when: ilo_auth_token is not defined or ilo_auth_token == ""
+  
+- name: Debug ILO IP
+  tags:
+    - ilo-create-user
+  debug: var=ilo_ip
+  
+- name: Debug ILO auth token
+  tags:
+    - ilo-create-user
+  debug: var=ilo_auth_token
+  
+- name: Construct ilo account
+  tags:
+    - ilo-create-user
+  set_fact:
+    _ilo_account: "{{ Accounts }}"
+    
+- name: JSONify boot dataset
+  tags:
+    - ilo-create-user
+  set_fact:
+    _ilo_account_json: "{{ _ilo_account | to_json }}"
+            
+- name: Debug ilo account
+  tags:
+    - ilo-create-user
+  debug: var=_ilo_account_json
+
+- name: Use CURL to execute
+  tags:
+    - ilo-create-user
+  shell: "curl -X POST -s -k -H 'X-Auth-Token: {{ ilo_auth_token }}' -H 'OData: 4.0' -H 'Content-Type: application/json' https://{{ ilo_ip }}/redfish/v1/AccountService/Accounts/ -d '{{ _ilo_account_json | string }}'"
+
+  register: curl_output
+  
+- name: Debug
+  tags:
+    - ilo-create-user
+  debug:
+    var: curl_output
+    
+- name: Signal failure if stderr is not null
+  tags:
+    - ilo-create-user
+  set_fact:
+    op_status: "FAIL"
+    op_msg: "{{ curl_output.stdout }}"
+  when: curl_output.stderr != ""
+  
+- name: Log messsage
+  tags:
+    - get-ilo-sso
+  shell: echo "`date "+%Y-%m-%d %H:%M:%S"` {{ op_status }} ILO_SET_BOOTSOURCE {{ server_profile_name }} {{ op_msg }}" >> {{ stats_log }}
+  when: "stats_log is defined"  
+  
+- name: Fail if errored
+  tags:
+    - ilo-create-user
+  fail:
+    msg: "{{ op_msg }}"
+  when:
+    op_status == "FAIL"
+    

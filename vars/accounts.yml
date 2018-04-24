@@ -1,0 +1,17 @@
+Accounts:
+  Oem:
+    Hpe:
+      LoginName: "{{ ilo_username }}"
+      Privileges:
+        HostBIOSConfigPriv: true
+        HostNICConfigPriv: true
+        HostStorageConfigPriv: true
+        LoginPriv: true
+        RemoteConsolePriv: true
+        UserConfigPriv: true
+        VirtualMediaPriv: true
+        VirtualPowerAndResetPriv: true
+        iLOConfigPriv: true
+  Password: "{{ ilo_password }}"
+  UserName: "{{ ilo_username }}"
+
